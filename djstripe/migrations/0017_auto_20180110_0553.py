@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('djstripe', '0016_auto_20180109_2057'),
+        ('djstripe', '0001_initial'),
     ]
 
     operations = [
