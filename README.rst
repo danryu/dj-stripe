@@ -3,6 +3,8 @@ dj-stripe
 =============================
 Django + Stripe Made Easy
 
+NB hacking multiplan
+
 Badges
 ------
 
