@@ -22,7 +22,7 @@
             {% if customer.subscription.plan == plan and customer.subscription.is_valid %}
             <div class="btn btn-default disabled">
             {% else %}
-            <a class="btn btn-primary" href="{% url 'djstripe:confirm' plan_id=plan.id %}" role="button">
+            <a class="btn btn-primary" href="{% url 'djstripe:confirm' plan_id=plan.djstripe_id %}" role="button">
             {% endif %}
                   {% with image=plan.image|default:"img/default-plan-image.png" %}
                     <img src="{% static image %}" class="img-thumbnail" />

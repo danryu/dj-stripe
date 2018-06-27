@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 .. module:: djstripe.urls.
 
@@ -20,8 +19,6 @@
 
 .. moduleauthor:: @pydanny
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from django.conf.urls import url
 
 from . import settings as app_settings
@@ -43,11 +40,16 @@ urlpatterns = [
         name="subscribe"
     ),
     url(
+        r"^cancel/subscription/$",
+        views.CancelSubscriptionView.as_view(),
+        name="cancel_subscription"
+    ),
+    url(
         r"^confirm/(?P<plan_id>.+)/$",
         views.ConfirmFormView.as_view(),
         name="confirm"
     ),
-    url(
+        url(
         r"^change/plan/$",
         views.ChangePlanView.as_view(),
         name="change_plan"
@@ -68,7 +70,6 @@ urlpatterns = [
         name="history"
     ),
 
-
     # Web services
     url(
         r"^a/sync/history/$",
@@ -82,6 +83,4 @@ urlpatterns = [
         views.ProcessWebhookView.as_view(),
         name="webhook"
     ),
-
-
 ]

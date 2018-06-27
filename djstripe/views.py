@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 .. module:: djstripe.webhooks.
 
@@ -6,38 +5,42 @@
 
 .. moduleauthor:: @kavdev, @pydanny, @lskillen, @wahuneke, @dollydagr, @chrissmejia
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 
-from braces.views import FormValidMessageMixin, SelectRelatedMixin
 from django.contrib import messages
-from django.contrib.auth import logout as auth_logout
 from django.contrib.auth import REDIRECT_FIELD_NAME
+from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError
-from django.shortcuts import render, redirect
+from django.shortcuts import redirect
 from django.urls import reverse_lazy, reverse
 from django.utils.decorators import method_decorator
 from django.utils.http import is_safe_url
-from django.utils.encoding import smart_str
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import FormView, DetailView, TemplateView, View
 from stripe.error import StripeError
 
 from . import settings as djstripe_settings
 from .enums import SubscriptionStatus
-from .forms import PlanForm, CancelSubscriptionForm
+from .forms import CancelSubscriptionForm
+from .forms import PlanForm
 from .mixins import SubscriptionMixin, PaymentsContextMixin
 from .models import Customer, WebhookEventTrigger, Plan
 from .sync import sync_subscriber
 
-logger = logging.getLogger(__name__)
+
+#logger = logging.getLogger(__name__)
+from afxcc import settings
+logging.config.dictConfig(settings.LOGGING)
+logger = logging.getLogger('django')
+
+
+### --- hacking
+from braces.views import FormValidMessageMixin, SelectRelatedMixin
 
 # ============================================================================ #
 #                                 Account Views                                #
 # ============================================================================ #
-
 
 class AccountView(LoginRequiredMixin, SubscriptionMixin, PaymentsContextMixin, TemplateView):
     """Shows account details including customer and subscription details."""
@@ -131,66 +134,6 @@ class SyncHistoryView(LoginRequiredMixin, View):
 #                              Subscription Views                              #
 # ============================================================================ #
 
-class ConfirmFormView(LoginRequiredMixin, FormValidMessageMixin, SubscriptionMixin, FormView):
-    """A view used to confirm customers into a subscription plan."""
-
-    form_class = PlanForm
-    template_name = "djstripe/confirm_form.html"
-    success_url = reverse_lazy("djstripe:history")
-    form_valid_message = "You are now subscribed!"
-
-    def get(self, request, *args, **kwargs):
-        """Override ConfirmFormView GET to perform extra validation.
-
-        - Returns 404 when no plan exists.
-        - Redirects to djstripe:subscribe when customer is already subscribed to this plan.
-        """
-        plan_id = self.kwargs['plan_id']
-
-        if not Plan.objects.filter(djstripe_id=plan_id).exists():
-            return HttpResponseNotFound()
-
-        customer, _created = Customer.get_or_create(
-            subscriber=djstripe_settings.subscriber_request_callback(self.request)
-        )
-
-        if (customer.subscription and str(customer.subscription.plan.djstripe_id) == plan_id and
-                customer.subscription.is_valid()):
-            message = "You already subscribed to this plan"
-            messages.info(request, message, fail_silently=True)
-            return redirect("djstripe:subscribe")
-
-        return super(ConfirmFormView, self).get(request, *args, **kwargs)
-
-    def get_context_data(self, *args, **kwargs):
-        """Return ConfirmFormView's context with plan_id."""
-        context = super(ConfirmFormView, self).get_context_data(**kwargs)
-        context['plan'] = Plan.objects.get(djstripe_id=self.kwargs['plan_id'])
-        return context
-
-    def post(self, request, *args, **kwargs):
-        """
-        Handle POST requests.
-
-        Instantiates a form instance with the passed POST variables and
-        then checks for validity.
-        """
-        form_class = self.get_form_class()
-        form = self.get_form(form_class)
-        if form.is_valid():
-            try:
-                customer, _created = Customer.get_or_create(
-                    subscriber=djstripe_settings.subscriber_request_callback(self.request)
-                )
-                customer.add_card(self.request.POST.get("stripe_token"))
-                customer.subscribe(form.cleaned_data["plan"])
-            except StripeError as exc:
-                form.add_error(None, str(exc))
-                return self.form_invalid(form)
-            return self.form_valid(form)
-        else:
-            return self.form_invalid(form)
-
 class SubscribeView(LoginRequiredMixin, SubscriptionMixin, TemplateView):
     """A view to render the subscribe template."""
 
@@ -243,7 +186,7 @@ class CancelSubscriptionView(LoginRequiredMixin, SubscriptionMixin, FormView):
                 status=subscription.status, period_end=subscription.current_period_end)
             )
 
-        return super(CancelSubscriptionView, self).form_valid(form)
+        return super().form_valid(form)
 
     def status_cancel(self):
         """Triggered when the subscription is immediately canceled (not pro-rated)"""
@@ -253,6 +196,97 @@ class CancelSubscriptionView(LoginRequiredMixin, SubscriptionMixin, FormView):
         auth_logout(self.request)
         # Redirect to next url
         return redirect(self.get_redirect_url())
+
+class ConfirmFormView(LoginRequiredMixin, FormValidMessageMixin, SubscriptionMixin, FormView):
+    """A view used to confirm customers into a subscription plan."""
+
+    form_class = PlanForm
+    template_name = "djstripe/confirm_form.html"
+    success_url = reverse_lazy("djstripe:history")
+    form_valid_message = "You are now subscribed!"
+
+    def get(self, request, *args, **kwargs):
+        """Override ConfirmFormView GET to perform extra validation.
+
+        - Returns 404 when no plan exists.
+        - Redirects to djstripe:subscribe when customer is already subscribed to this plan.
+        """
+        plan_id = self.kwargs['plan_id']
+
+        if not Plan.objects.filter(djstripe_id=plan_id).exists():
+            return HttpResponseNotFound()
+
+        customer, _created = Customer.get_or_create(
+            subscriber=djstripe_settings.subscriber_request_callback(self.request)
+        )
+
+        if (customer.subscription and str(customer.subscription.plan.djstripe_id) == plan_id and
+                customer.subscription.is_valid()):
+            message = "You already subscribed to this plan"
+            messages.info(request, message, fail_silently=True)
+            return redirect("djstripe:subscribe")
+
+        return super(ConfirmFormView, self).get(request, *args, **kwargs)
+
+    def get_context_data(self, *args, **kwargs):
+        """Return ConfirmFormView's context with plan_id."""
+        context = super(ConfirmFormView, self).get_context_data(**kwargs)
+        context['plan'] = Plan.objects.get(djstripe_id=self.kwargs['plan_id'])
+        return context
+
+    def post(self, request, *args, **kwargs):
+        """
+        Handle POST requests.
+
+        Instantiates a form instance with the passed POST variables and
+        then checks for validity.
+        """
+        form_class = self.get_form_class()
+        form = self.get_form(form_class)
+        if form.is_valid():
+            try:
+                customer, _created = Customer.get_or_create(
+                    subscriber=djstripe_settings.subscriber_request_callback(self.request)
+                )
+                customer.add_card(self.request.POST.get("stripe_token"))
+
+                formplan = form.cleaned_data["plan"]
+
+                logger.debug(">>>>>> formplan: %s", formplan)
+
+                sub_plan = Plan.objects.get(djstripe_id=formplan.djstripe_id)
+
+                logger.debug(">>>>>> sub_plan: %s", sub_plan)
+
+#                sub_plan = form.cleaned_data["plan"]
+
+                # only add subscription if one doesn't exist
+                # if customer.has_active_subscription(sub_plan) is not True:
+                #     sub = customer.subscribe(sub_plan)
+                # else:
+                #     sub = customer.has_active_subscription(sub_plan)
+
+                if customer.subscription is None:
+                    sub = customer.subscribe(plan=sub_plan)
+                else:
+                    sub = customer.subscription
+
+                ## do the equivalent of
+                # stripe.SubscriptionItem.create(
+                #   subscription="sub_D4WVtaNJuV82hS",
+                #   plan="plan_D4WlT1WW8pTVgE",
+                # )
+                sub_item = sub.subscriptionitems.create(plan=sub_plan) #FIXME is this sane?
+
+                ## Start VPS Provisioning
+                VPS.new_VPS(user=request.user, subscription_item=sub_item)
+
+            except StripeError as exc:
+                form.add_error(None, str(exc))
+                return self.form_invalid(form)
+            return self.form_valid(form)
+        else:
+            return self.form_invalid(form)
 
 
 class ChangePlanView(LoginRequiredMixin, FormValidMessageMixin, SubscriptionMixin, FormView):
@@ -305,6 +339,8 @@ class ChangePlanView(LoginRequiredMixin, FormValidMessageMixin, SubscriptionMixi
             return self.form_valid(form)
         else:
             return self.form_invalid(form)
+
+
 
 
 # ============================================================================ #
