@@ -9,7 +9,6 @@ Badges
 .. image:: https://travis-ci.org/dj-stripe/dj-stripe.png
    :alt: Build Status
    :target: https://travis-ci.org/dj-stripe/dj-stripe
->>>>>>> upstream/master
 
 Stripe Models for Django.
 
