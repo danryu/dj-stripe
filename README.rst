@@ -94,6 +94,15 @@ Assuming the tests are run against PostgreSQL::
     pip install tox
     tox
 
+Note: you will likely need the following configuration in your pg_hba.conf::
+
+    # IPv4 local connections:
+    host    all             all             127.0.0.1/32            trust
+
+And possibly also install dependencies that tox doesn't install for you::
+
+    pip install coverage termcolor django_nose django-rest-framework
+
 Follows Best Practices
 ======================
 
